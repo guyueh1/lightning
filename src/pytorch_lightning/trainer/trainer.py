@@ -109,6 +109,7 @@ from pytorch_lightning.utilities.types import (
 )
 
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 # warnings to ignore in trainer
 warnings.filterwarnings(
     "ignore", message="torch.distributed.reduce_op is deprecated, please use torch.distributed.ReduceOp instead"
@@ -1055,9 +1056,15 @@ class Trainer:
             log.detail(f"{self.__class__.__name__}: restoring module and callbacks from checkpoint path: {ckpt_path}")
             self._restore_modules_and_callbacks(ckpt_path)
 
+        mem = torch.cuda.memory_allocated()
+        log.info(f"{self.__class__.__name__}: Memory usage {mem//1024//1024} MBytes")
+
         log.detail(f"{self.__class__.__name__}: configuring sharded model")
         self._call_configure_sharded_model()  # allow user to setup in model sharded environment
 
+        mem = torch.cuda.memory_allocated()
+        log.info(f"{self.__class__.__name__}: Memory usage {mem//1024//1024} MBytes")
+        
         # ----------------------------
         # INSPECT THE CORE LOOPS
         # ----------------------------
@@ -1092,11 +1099,19 @@ class Trainer:
         # strategy will configure model and move it to the device
         self.strategy.setup(self)
 
+        mem = torch.cuda.memory_allocated()
+        log.info(f"{self.__class__.__name__}: After strategy_setup()")
+        log.info(f"{self.__class__.__name__}: Memory usage {mem//1024//1024} MBytes")
+        
         # hook
         if self.state.fn == TrainerFn.FITTING:
             self._call_callback_hooks("on_fit_start")
             self._call_lightning_module_hook("on_fit_start")
-
+        
+        mem = torch.cuda.memory_allocated()
+        log.info(f"{self.__class__.__name__}: After on_fit_start")
+        log.info(f"{self.__class__.__name__}: Memory usage {mem//1024//1024} MBytes")
+        
         self._log_hyperparams()
 
         if self.strategy.restore_checkpoint_after_setup:
